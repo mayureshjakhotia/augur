@@ -5,6 +5,7 @@ import { youSearch, hasYouCom } from "./providers/youcom.js";
 import { llmComplete, llmStream, llmProvider } from "./providers/llm.js";
 import { insList, insInsert, insUpdate, storageMode } from "./providers/insforge.js";
 import * as game from "./game.js";
+import { hasEleven, ttsMode, elevenSpeak } from "./providers/tts.js";
 
 const app = express();
 app.use(cors());
@@ -17,7 +18,23 @@ app.get("/api/status", (_req, res) => {
     youcom: hasYouCom() ? "live" : "mock",
     llm: llmProvider(),
     storage: storageMode(),
+    tts: ttsMode(),
   });
+});
+
+// Studio-grade voice (ElevenLabs) when a key is present; else 404 → browser TTS.
+app.get("/api/speak", async (req, res) => {
+  const text = (req.query.text || "").toString().slice(0, 600);
+  if (!hasEleven() || !text) return res.status(404).end();
+  try {
+    const audio = await elevenSpeak(text);
+    res.set("Content-Type", "audio/mpeg");
+    res.set("Cache-Control", "no-store");
+    res.send(audio);
+  } catch (e) {
+    console.error("tts error:", e.message);
+    res.status(500).end();
+  }
 });
 
 // Read the omens — multi-angle real-time search via You.com, deduped.

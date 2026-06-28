@@ -5,29 +5,59 @@ const api = (p, opts) => fetch(p, opts).then((r) => r.json());
 // ---- The Augur's voice + atmosphere (no API keys, pure browser) ----
 let _voice = null;
 function pickVoice() {
-  if (_voice) return _voice;
   const vs = window.speechSynthesis?.getVoices?.() || [];
-  // Prefer a deep / British / male-ish English voice for oracular gravitas.
-  _voice = vs.find((v) => /(daniel|arthur|oliver|google uk english male|rishi)/i.test(v.name))
-    || vs.find((v) => /en-GB/i.test(v.lang))
-    || vs.find((v) => /en/i.test(v.lang)) || vs[0] || null;
+  if (!vs.length) return _voice;
+  // Quality ladder: Chrome's online NEURAL voices first (warm, not robotic),
+  // then premium/enhanced OS voices, then any English. Avoid "compact" voices.
+  const score = (v) => {
+    const n = v.name.toLowerCase();
+    let s = 0;
+    if (/google uk english male/.test(n)) s += 100;     // deep, neural, oracular
+    else if (/google (us|uk) english/.test(n)) s += 90; // neural
+    else if (/google/.test(n) && /en/i.test(v.lang)) s += 80;
+    if (/(natural|neural|premium|enhanced)/.test(n)) s += 40;
+    if (/(arthur|oliver|serena|matilda|daniel)/.test(n) && /(premium|enhanced)/.test(n)) s += 20;
+    if (/compact/.test(n)) s -= 50;
+    if (/en-gb/i.test(v.lang)) s += 8;
+    if (/^en/i.test(v.lang)) s += 5;
+    return s;
+  };
+  _voice = vs.filter((v) => /en/i.test(v.lang)).sort((a, b) => score(b) - score(a))[0] || vs[0] || null;
   return _voice;
 }
 if (typeof window !== "undefined" && window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => { _voice = null; pickVoice(); };
 }
-function speak(text) {
+let _ttsMode = "browser"; // upgraded to "eleven" when the server has a studio key
+let _audioEl = null;
+export function setTtsMode(m) { if (m) _ttsMode = m; }
+
+function speakBrowser(text) {
   try {
     const s = window.speechSynthesis;
     if (!s || !text) return;
     s.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice(); if (v) u.voice = v;
-    u.rate = 0.82; u.pitch = 0.7; u.volume = 1;
+    const v = _voice || pickVoice(); if (v) u.voice = v;
+    // Natural pitch (the 0.7 was the robotic culprit) + a slow, measured cadence.
+    u.rate = 0.86; u.pitch = 0.92; u.volume = 1;
     s.speak(u);
   } catch {}
 }
-function stopSpeak() { try { window.speechSynthesis?.cancel(); } catch {} }
+function speak(text) {
+  if (!text) return;
+  if (_ttsMode !== "eleven") return speakBrowser(text);
+  try {
+    stopSpeak();
+    const el = new Audio(`/api/speak?text=${encodeURIComponent(text)}`);
+    _audioEl = el;
+    el.play().catch(() => speakBrowser(text)); // studio voice; fall back if it fails
+  } catch { speakBrowser(text); }
+}
+function stopSpeak() {
+  try { window.speechSynthesis?.cancel(); } catch {}
+  try { if (_audioEl) { _audioEl.pause(); _audioEl = null; } } catch {}
+}
 
 // A deep, ominous toll — the fates stir.
 function toll() {
@@ -109,7 +139,7 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
   function refreshAll() {
-    api("/api/status").then(setStatus).catch(() => {});
+    api("/api/status").then((s) => { setStatus(s); setTtsMode(s?.tts); }).catch(() => {});
     api("/api/prophecies").then(setLedger).catch(() => {});
     api("/api/record").then(setRecord).catch(() => {});
   }
