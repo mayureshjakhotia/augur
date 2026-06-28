@@ -1,7 +1,7 @@
 // LLM synthesis layer. Pluggable OpenAI-compatible providers:
-//   Groq (free, no card) → Nebius Token Factory → Anthropic Claude → mock.
+//   Groq (free, no card) → Nebius Token Factory → mock.
 
-// Provider configs (all OpenAI-compatible except anthropic).
+// Provider configs (OpenAI-compatible).
 const PROVIDERS = {
   groq: {
     key: () => process.env.GROQ_API_KEY,
@@ -18,14 +18,12 @@ const PROVIDERS = {
 export function llmProvider() {
   if (process.env.GROQ_API_KEY) return "groq";
   if (process.env.NEBIUS_API_KEY) return "nebius";
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   return "mock";
 }
 
 // messages: [{role, content}]. Returns string. Asks for JSON when jsonMode true.
 export async function llmComplete(system, user, { jsonMode = false } = {}) {
   const provider = llmProvider();
-  if (provider === "anthropic") return anthropic(system, user, jsonMode);
   if (provider === "mock") return mock(user, jsonMode);
   return openaiCompatible(PROVIDERS[provider], provider, system, user, jsonMode);
 }
@@ -95,30 +93,6 @@ export async function llmStream(system, user, onToken) {
   return full;
 }
 
-async function anthropic(system, user, jsonMode) {
-  const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1500,
-      system: system + (jsonMode ? " Respond with valid JSON only, no markdown." : ""),
-      messages: [{ role: "user", content: user }],
-    }),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Anthropic failed ${res.status}: ${t.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return data.content?.[0]?.text || "";
-}
-
 function mock(user, jsonMode) {
   if (jsonMode) {
     return JSON.stringify({
@@ -135,5 +109,5 @@ function mock(user, jsonMode) {
         "This one has all the makings of a classic. Momentum, tension, and a squad hitting its stride — strap in.",
     });
   }
-  return "This is a mock briefing generated without an LLM key configured. Add a Nebius or Anthropic key to enable real synthesis.";
+  return "This is a mock briefing generated without an LLM key configured. Add a Groq or Nebius key to enable real synthesis.";
 }

@@ -34,7 +34,7 @@ Or `./start.sh`. The app runs fully in **mock mode** with no keys; add keys in
 - `YOUCOM_API_KEY` — you.com/platform (real-time cited search)
 - `GROQ_API_KEY` (+ `GROQ_MODEL`) — console.groq.com (free, no card)
 - `INSFORGE_BASE_URL` + `INSFORGE_API_KEY` — insforge.dev (the `prophecies` ledger)
-- Optional fallbacks: `NEBIUS_API_KEY`, `ANTHROPIC_API_KEY`
+- Optional fallback: `NEBIUS_API_KEY`
 
 ## API
 - `POST /api/prophecy {question}` — divine a cited, calibrated forecast

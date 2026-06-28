@@ -60,4 +60,4 @@ You.com ($1,000) · InsForge ($500) · Best Overall · Most Innovative · Best D
 ## Tech
 React + Vite + Tailwind (arcane UI, Web Audio chimes/toll, Web Speech voice in/out) ·
 Node/Express (SSE streaming) · You.com Search · Groq (streaming, OpenAI-compatible) ·
-InsForge REST. Pluggable LLM (Groq → Nebius → Anthropic). Runs in mock mode with no keys.
+InsForge REST. Pluggable LLM (Groq, Nebius). Runs in mock mode with no keys.
