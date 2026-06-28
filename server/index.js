@@ -2,8 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { youSearch, hasYouCom } from "./providers/youcom.js";
-import { llmComplete, llmProvider } from "./providers/llm.js";
+import { llmComplete, llmStream, llmProvider } from "./providers/llm.js";
 import { insList, insInsert, insUpdate, storageMode } from "./providers/insforge.js";
+import * as game from "./game.js";
 
 const app = express();
 app.use(cors());
@@ -19,73 +20,106 @@ app.get("/api/status", (_req, res) => {
   });
 });
 
-// ---- Core: divine a calibrated, cited forecast for any question ----
-app.post("/api/prophecy", async (req, res) => {
-  const question = (req.body?.question || "").trim();
-  if (!question) return res.status(400).json({ error: "question is required" });
+// Read the omens — multi-angle real-time search via You.com, deduped.
+async function searchOmens(question) {
+  const queries = [question, `${question} latest news evidence`, `${question} analysis prediction odds`];
+  const batches = await Promise.all(queries.map((q) => youSearch(q, { count: 5 }).catch(() => [])));
+  const seen = new Set(), sources = [];
+  for (const batch of batches) for (const s of batch) {
+    if (s.url && !seen.has(s.url)) { seen.add(s.url); sources.push(s); }
+  }
+  return sources.slice(0, 10);
+}
+const omenContext = (top) =>
+  top.map((s, i) => `[${i + 1}] ${s.title} (${s.source}${s.published ? ", " + s.published : ""})\n${s.snippet}`).join("\n\n");
 
-  try {
-    // 1. Read the omens — multi-angle real-time search via You.com.
-    const queries = [
-      question,
-      `${question} latest news evidence`,
-      `${question} analysis prediction odds`,
-    ];
-    const batches = await Promise.all(
-      queries.map((q) => youSearch(q, { count: 5 }).catch(() => []))
-    );
-    const seen = new Set();
-    const sources = [];
-    for (const batch of batches) {
-      for (const s of batch) {
-        if (!s.url || seen.has(s.url)) continue;
-        seen.add(s.url);
-        sources.push(s);
-      }
-    }
-    const top = sources.slice(0, 10);
+const FORECAST_SYSTEM =
+  "You are AUGUR, a disciplined forecasting oracle. You read live omens " +
+  "(search results) and produce CALIBRATED probability forecasts. You are " +
+  "well-calibrated: when you say 70%, you are right ~70% of the time. You " +
+  "cite omens inline as [n]. You never overclaim. Output strictly valid JSON.";
 
-    // 2. Divine — calibrated forecast grounded strictly in the cited omens.
-    const context = top
-      .map((s, i) => `[${i + 1}] ${s.title} (${s.source}${s.published ? ", " + s.published : ""})\n${s.snippet}`)
-      .join("\n\n");
-
-    const system =
-      "You are AUGUR, a disciplined forecasting oracle. You read live omens " +
-      "(search results) and produce CALIBRATED probability forecasts. You are " +
-      "well-calibrated: when you say 70%, you are right ~70% of the time. You " +
-      "cite omens inline as [n]. You never overclaim. Output strictly valid JSON.";
-
-    const user = `QUESTION: ${question}
+function forecastUser(question, context) {
+  return `QUESTION: ${question}
 
 OMENS (live search results):
 ${context || "(no omens retrieved — reason from base rates and say so)"}
 
-Produce a JSON object with EXACTLY these fields:
+Think like a superforecaster. FIRST steelman both sides, THEN commit a calibrated
+number that reflects genuine uncertainty (avoid 0/100; most real questions land
+between 15 and 85). Produce a JSON object with EXACTLY these fields:
 {
+  "verse": "a 2-line cryptic oracular couplet foretelling the answer — mystical, evocative, spoken aloud by a seer. NO numbers, NO citations, NO brackets. Use a newline between the two lines.",
   "headline": "one sharp sentence on the current state of play",
+  "bull_case": ["exactly 2 short reasons YES — max 11 words each, end with [n]"],
+  "bear_case": ["exactly 2 short reasons NO — max 11 words each, end with [n]"],
   "verdict": "one of: Very likely | Likely | Toss-up | Unlikely | Very unlikely",
   "probability": <integer 0-100, your calibrated probability the answer is YES>,
-  "reasoning": "2-3 sentences justifying the probability, citing [n]",
-  "key_factors": ["3-5 short cited factors, each ending with [n] where possible"],
-  "wildcard": "the single X-factor that could flip this",
-  "resolve_by": "a concrete date or condition by which this resolves (e.g. 'Aug 1 2026' or 'when the deal closes')",
+  "reasoning": "ONE punchy sentence justifying the number, citing [n]",
+  "wildcard": "the single X-factor that could flip this — max 12 words",
+  "resolve_by": "a concrete date or condition by which this resolves",
   "category": "one short tag: Tech | Markets | Sports | Politics | Science | Business | Other"
-}`;
+}
+Be terse. Brevity is a feature.`;
+}
 
-    const raw = await llmComplete(system, user, { jsonMode: true });
-    const analysis = safeJson(raw);
+const VERSE_SYSTEM =
+  "You are AUGUR, an ancient seer channeling a vision. Utter a 2-line cryptic " +
+  "oracular couplet that foretells the answer. Mystical, evocative, a little ominous. " +
+  "NO numbers, NO citations, NO brackets. Newline between the two lines. Output ONLY the couplet.";
 
+// ---- Core: divine a calibrated, cited forecast for any question ----
+app.post("/api/prophecy", async (req, res) => {
+  const question = (req.body?.question || "").trim();
+  if (!question) return res.status(400).json({ error: "question is required" });
+  try {
+    const top = await searchOmens(question);
+    const analysis = safeJson(await llmComplete(FORECAST_SYSTEM, forecastUser(question, omenContext(top)), { jsonMode: true }));
     res.json({
-      question,
-      generated_at: new Date().toISOString(),
-      analysis,
-      sources: top,
+      question, generated_at: new Date().toISOString(), analysis, sources: top,
       meta: { youcom: hasYouCom() ? "live" : "mock", llm: llmProvider() },
     });
   } catch (err) {
     console.error("prophecy error:", err);
     res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+// ---- Streaming divination (SSE): the verse channels in live, then the receipts ----
+app.get("/api/prophecy/stream", async (req, res) => {
+  const question = (req.query.question || "").trim();
+  if (!question) return res.status(400).end();
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+  });
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  try {
+    const top = await searchOmens(question);
+    send("omens", { count: top.length });
+    const ctx = omenContext(top);
+
+    // Full structured forecast runs in parallel while the verse streams.
+    const analysisP = llmComplete(FORECAST_SYSTEM, forecastUser(question, ctx), { jsonMode: true })
+      .then(safeJson).catch(() => null);
+
+    let verse = "";
+    await llmStream(VERSE_SYSTEM, `Question: ${question}\nOmens:\n${ctx}`, (tok) => {
+      verse += tok;
+      send("verse", { t: tok });
+    });
+
+    const analysis = (await analysisP) || {};
+    analysis.verse = (analysis.verse && analysis.verse.trim()) || verse.trim();
+    send("done", {
+      question, generated_at: new Date().toISOString(), analysis, sources: top,
+      meta: { youcom: hasYouCom() ? "live" : "mock", llm: llmProvider() },
+    });
+  } catch (e) {
+    send("error", { message: String(e.message || e) });
+  } finally {
+    res.end();
   }
 });
 
@@ -101,14 +135,16 @@ app.get("/api/prophecies", async (_req, res) => {
 // Inscribe a prophecy into the ledger (status: pending)
 app.post("/api/prophecies", async (req, res) => {
   try {
-    const { question, analysis, sources } = req.body || {};
+    const { question, analysis, sources, userProbability } = req.body || {};
     if (!question) return res.status(400).json({ error: "question required" });
+    const merged = { ...(analysis || {}) };
+    if (typeof userProbability === "number") merged.user_probability = userProbability;
     const row = await insInsert(TABLE, {
       question,
       category: analysis?.category || "Other",
       verdict: analysis?.verdict || null,
       probability: typeof analysis?.probability === "number" ? analysis.probability : null,
-      analysis: analysis || {},
+      analysis: merged,
       sources: sources || [],
       status: "pending",
       resolve_by: analysis?.resolve_by || null,
@@ -198,11 +234,43 @@ app.get("/api/record", async (_req, res) => {
       return { ...b, n: inB.length, hitRate: inB.length ? Math.round((hit / inB.length) * 100) : null };
     });
 
-    res.json({ total_prophecies: all.length, resolved: total, correct, accuracy, pending: all.length - total, calibration: buckets });
+    // You vs AUGUR — Brier head-to-head where the human locked a guess.
+    let youWins = 0, augurWins = 0, ties = 0, h2hN = 0;
+    for (const p of resolved) {
+      const a = typeof p.analysis === "string" ? safeJson(p.analysis) : p.analysis || {};
+      if (typeof a.user_probability !== "number" || typeof p.probability !== "number") continue;
+      const leanYes = p.probability >= 50;
+      const truth = p.status === "correct" ? (leanYes ? 1 : 0) : (leanYes ? 0 : 1);
+      const bAug = (p.probability / 100 - truth) ** 2;
+      const bYou = (a.user_probability / 100 - truth) ** 2;
+      h2hN++;
+      if (bYou < bAug) youWins++; else if (bAug < bYou) augurWins++; else ties++;
+    }
+
+    res.json({
+      total_prophecies: all.length, resolved: total, correct, accuracy,
+      pending: all.length - total, calibration: buckets,
+      head_to_head: { n: h2hN, you: youWins, augur: augurWins, ties },
+    });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+
+// ===================== THE CHANGELING — party game =====================
+const wrap = (fn) => async (req, res) => {
+  try { res.json(await fn(req)); }
+  catch (e) { res.status(400).json({ error: String(e.message || e) }); }
+};
+
+app.post("/api/game/create", wrap((req) => game.createRoom(req.body?.name)));
+app.post("/api/game/join", wrap((req) => game.joinRoom(req.body?.code, req.body?.name)));
+app.get("/api/game/:code", wrap((req) => game.getState(req.params.code, req.query.playerId)));
+app.post("/api/game/:code/start", wrap((req) => game.startRound(req.params.code, req.body?.playerId)));
+app.post("/api/game/:code/answer", wrap((req) => game.submitAnswer(req.params.code, req.body?.playerId, req.body?.text)));
+app.post("/api/game/:code/vote", wrap((req) => game.castVote(req.params.code, req.body?.playerId, req.body?.answerId)));
+app.post("/api/game/:code/next", wrap((req) => game.nextRound(req.params.code, req.body?.playerId)));
+// =======================================================================
 
 function safeJson(raw) {
   if (!raw) return null;
