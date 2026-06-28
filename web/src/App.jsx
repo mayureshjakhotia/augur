@@ -111,10 +111,10 @@ function startListening(onText, onEnd) {
 }
 
 const EXAMPLES = [
-  "Will Anthropic release a new Claude model before September 2026?",
   "Will the Fed cut rates at its next meeting?",
-  "Will SpaceX reach Mars orbit before 2030?",
   "Will Bitcoin close above $150k this year?",
+  "Will the Lakers make the 2026 playoffs?",
+  "Will AI agents replace most SaaS by 2027?",
 ];
 
 export default function App() {
@@ -125,7 +125,7 @@ export default function App() {
   const [status, setStatus] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [record, setRecord] = useState(null);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true); // sound OFF by default — opt-in
   const [streamVerse, setStreamVerse] = useState("");
   const [listening, setListening] = useState(false);
 
@@ -149,7 +149,7 @@ export default function App() {
     if (!q.trim()) return;
     stopSpeak();
     setError(""); setProphecy(null); setStreamVerse(""); setLoading(true); setQuestion(q);
-    try { chime(); } catch {}
+    if (!muted) { try { chime(); } catch {} }
     try {
       await new Promise((resolve, reject) => {
         const es = new EventSource(`/api/prophecy/stream?question=${encodeURIComponent(q)}`);
@@ -202,7 +202,7 @@ export default function App() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && divine()}
-              placeholder={listening ? "speak your question, mortal…" : "Ask AUGUR about any uncertain future…"}
+              placeholder={listening ? "speak your question…" : "Ask anything about the future — a decision, a bet, a worry…"}
               className="flex-1 bg-void/80 border border-arcane/25 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-arcane/70 placeholder:text-slate-500"
             />
             <button
@@ -232,6 +232,7 @@ export default function App() {
         </div>
       </div>
 
+      {!prophecy && !loading && <HowItWorks />}
       {error && <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-300">The omens are clouded: {error}</div>}
       {loading && <Ceremony verse={streamVerse} />}
       {prophecy && <ProphecyCard key={prophecy.question} prophecy={prophecy} onInscribe={inscribe} muted={muted} />}
@@ -261,10 +262,10 @@ function Header({ status, record, muted, onToggleMute }) {
             <span className="crystal-ball">🔮</span>
             <h1 className="font-rune text-4xl sm:text-5xl font-extrabold tracking-wide glow-text">AUGUR</h1>
           </div>
-          <p className="text-slate-400 text-sm mt-2 max-w-lg">
-            Ask any question about the future. AUGUR reads the living omens, divines a
-            <span className="text-ether"> calibrated forecast with receipts</span> — then comes back and
-            <span className="text-arcane"> grades itself</span>. The only AI brave enough to keep score.
+          <p className="text-slate-300 text-sm mt-2 max-w-xl leading-relaxed">
+            A <span className="text-slate-100 font-medium">research assistant for the future.</span> Ask anything uncertain —
+            AUGUR searches the <span className="text-ether">live web</span>, answers with a
+            <span className="text-arcane"> probability + sources you can check</span>, then tracks how often it's right.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -344,6 +345,25 @@ function ProphecyCard({ prophecy, onInscribe, muted }) {
   const [guess, setGuess] = useState(50);
   const [locked, setLocked] = useState(prob === null);
   const [saved, setSaved] = useState(false);
+  const [thread, setThread] = useState([]);
+  const [followInput, setFollowInput] = useState("");
+  const [asking, setAsking] = useState(false);
+
+  async function ask(text) {
+    const f = (text || followInput).trim();
+    if (!f || asking) return;
+    setAsking(true); setFollowInput("");
+    setThread((t) => [...t, { q: f, a: null }]);
+    try {
+      const r = await api("/api/ask", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prophecy.question, followup: f }),
+      });
+      setThread((t) => t.map((m, i) => i === t.length - 1 ? { ...m, a: r.answer || "(no answer)" } : m));
+    } catch {
+      setThread((t) => t.map((m, i) => i === t.length - 1 ? { ...m, a: "(the omens went silent)" } : m));
+    } finally { setAsking(false); }
+  }
 
   // The Augur awakens: chime + speak the verse aloud (once per prophecy).
   useEffect(() => {
@@ -431,6 +451,38 @@ function ProphecyCard({ prophecy, onInscribe, muted }) {
               className="mt-5 text-sm border border-ether/30 hover:border-ether/70 rounded-lg px-4 py-2 text-slate-200 disabled:opacity-50">
               {saved ? "❖ Inscribed to the Ledger" : "❖ Inscribe this prophecy (with your call)"}
             </button>
+
+            {/* Conversational drill-down — interrogate the forecast */}
+            <div className="mt-6 border-t border-white/5 pt-4">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-arcane/70 font-rune mb-2">Interrogate the Augur</div>
+              {thread.length > 0 && (
+                <div className="space-y-3 mb-3">
+                  {thread.map((m, i) => (
+                    <div key={i}>
+                      <div className="text-sm text-slate-300"><span className="text-ether">›</span> {m.q}</div>
+                      <div className="text-sm text-slate-200 mt-1 pl-3 leading-relaxed">
+                        {m.a === null ? <span className="text-slate-500 animate-pulse">consulting the omens…</span> : cites(m.a)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2 mb-2">
+                {["Why this number?", "What would change it?", "What's the biggest risk?"].map((s) => (
+                  <button key={s} onClick={() => ask(s)} disabled={asking}
+                    className="text-[11px] bg-void border border-arcane/20 hover:border-arcane/60 rounded-full px-3 py-1 text-slate-400 hover:text-slate-200 disabled:opacity-40">
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input value={followInput} onChange={(e) => setFollowInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()}
+                  placeholder="ask a follow-up…"
+                  className="flex-1 bg-void/80 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-arcane/60 placeholder:text-slate-600" />
+                <button onClick={() => ask()} disabled={asking || !followInput.trim()}
+                  className="text-sm border border-ether/30 hover:border-ether/70 rounded-lg px-3 py-2 text-ether disabled:opacity-40">Ask</button>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -513,7 +565,7 @@ function LedgerCard({ p, onResolved, muted }) {
 
   async function resolve() {
     setPhase("deliberating");
-    toll();
+    if (!muted) toll();
     try {
       const r = await api(`/api/prophecies/${p.id}/resolve`, { method: "POST" });
       const res = { status: r.status, resolution: r.resolution };
@@ -606,6 +658,28 @@ function Orb({ value, animate }) {
         <span className="text-lg font-rune font-bold" style={{ color: hue }}>{value}</span>
         <span className="text-[8px] text-slate-500 -mt-0.5 tracking-widest">% YES</span>
       </div>
+    </div>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    { n: "1", icon: "💬", t: "Ask anything uncertain", d: "“Will the Fed cut rates?” · “Is now a good time to buy in Austin?”" },
+    { n: "2", icon: "🔎", t: "AUGUR researches it live", d: "Searches the web (You.com) and gives a probability + sources you can click." },
+    { n: "3", icon: "🎯", t: "It keeps score", d: "Every call is logged. Resolve it later and watch AUGUR grade itself." },
+  ];
+  return (
+    <div className="mt-5 grid sm:grid-cols-3 gap-3">
+      {steps.map((s) => (
+        <div key={s.n} className="bg-panel/40 border border-white/5 rounded-xl p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{s.icon}</span>
+            <span className="text-[10px] font-rune text-arcane/70 border border-arcane/30 rounded-full w-5 h-5 flex items-center justify-center">{s.n}</span>
+            <span className="text-sm font-semibold text-slate-100">{s.t}</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1.5 leading-snug">{s.d}</p>
+        </div>
+      ))}
     </div>
   );
 }

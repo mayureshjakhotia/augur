@@ -146,6 +146,25 @@ app.get("/api/prophecy/stream", async (req, res) => {
   }
 });
 
+// ---- Conversational follow-up: drill into a forecast, grounded in fresh omens ----
+app.post("/api/ask", async (req, res) => {
+  const question = (req.body?.question || "").trim();
+  const followup = (req.body?.followup || "").trim();
+  if (!followup) return res.status(400).json({ error: "followup is required" });
+  try {
+    const top = await searchOmens(`${question} ${followup}`);
+    const system =
+      "You are AUGUR, a sharp research assistant for questions about the future. " +
+      "Answer the user's follow-up in 2-4 tight sentences, grounded ONLY in the omens, " +
+      "citing [n]. Be direct and useful — no fluff, no hedging theatre.";
+    const user = `Original question: ${question}\nFollow-up: ${followup}\n\nOMENS (live):\n${omenContext(top)}`;
+    const answer = await llmComplete(system, user);
+    res.json({ answer, sources: top });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 // ---- The Ledger (InsForge) ----
 app.get("/api/prophecies", async (_req, res) => {
   try {
