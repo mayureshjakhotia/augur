@@ -45,9 +45,15 @@ function forecastUser(question, context) {
 OMENS (live search results):
 ${context || "(no omens retrieved — reason from base rates and say so)"}
 
-Think like a superforecaster. FIRST steelman both sides, THEN commit a calibrated
-number that reflects genuine uncertainty (avoid 0/100; most real questions land
-between 15 and 85). Produce a JSON object with EXACTLY these fields:
+Forecast like a superforecaster:
+1. ANCHOR on the base rate for this class of event.
+2. ADJUST up or down for the specific live evidence above.
+3. STEELMAN both sides before committing.
+Use the FULL range — say 80-92% when the evidence is genuinely strong, 8-20% when
+it's genuinely weak. Do NOT default to skepticism or cluster around 30%; a calibrated
+forecaster's numbers are spread out. Avoid exactly 0 or 100. Match "verdict" to your
+number: >=80 Very likely, 60-79 Likely, 40-59 Toss-up, 20-39 Unlikely, <20 Very unlikely.
+Produce a JSON object with EXACTLY these fields:
 {
   "verse": "a 2-line cryptic oracular couplet foretelling the answer — mystical, evocative, spoken aloud by a seer. NO numbers, NO citations, NO brackets. Use a newline between the two lines.",
   "headline": "one sharp sentence on the current state of play",

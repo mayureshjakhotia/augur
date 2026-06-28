@@ -100,6 +100,14 @@ export default function App() {
   const [listening, setListening] = useState(false);
 
   useEffect(() => { refreshAll(); pickVoice(); }, []);
+  // Live sync — the ledger & record stay current across every open client (InsForge).
+  useEffect(() => {
+    const t = setInterval(() => {
+      api("/api/prophecies").then(setLedger).catch(() => {});
+      api("/api/record").then(setRecord).catch(() => {});
+    }, 6000);
+    return () => clearInterval(t);
+  }, []);
   function refreshAll() {
     api("/api/status").then(setStatus).catch(() => {});
     api("/api/prophecies").then(setLedger).catch(() => {});
@@ -447,8 +455,13 @@ function Ledger({ ledger, onResolved, muted }) {
   if (!ledger.length) return null;
   return (
     <div className="mt-14">
-      <h3 className="font-rune text-lg font-semibold mb-1 text-slate-200">AUGUR's Ledger <span className="text-slate-500 text-sm font-body">· every prophecy, on the record</span></h3>
-      <p className="text-xs text-slate-500 mb-4">Inscribed to InsForge. Hit <span className="text-ether">Resolve</span> and AUGUR re-reads the omens to grade itself.</p>
+      <h3 className="font-rune text-lg font-semibold mb-1 text-slate-200 flex items-center gap-2">
+        AUGUR's Ledger
+        <span className="inline-flex items-center gap-1 text-[10px] font-body text-emerald-300 border border-emerald-400/30 bg-emerald-400/10 rounded-full px-2 py-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 aura" /> live · synced via InsForge
+        </span>
+      </h3>
+      <p className="text-xs text-slate-500 mb-4">Every prophecy, on the record — open on another device and watch it sync. Hit <span className="text-ether">Resolve</span> and AUGUR re-reads the omens to grade itself.</p>
       <div className="grid sm:grid-cols-2 gap-3">
         {ledger.map((p) => <LedgerCard key={p.id} p={p} onResolved={onResolved} muted={muted} />)}
       </div>
