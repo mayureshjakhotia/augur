@@ -90,8 +90,8 @@ const FORECAST_SYSTEM =
   "well-calibrated: when you say 70%, you are right ~70% of the time. You " +
   "cite omens inline as [n]. You never overclaim. Output strictly valid JSON.";
 
-function forecastUser(question, context) {
-  return `QUESTION: ${question}
+function forecastUser(question, context, calib = "") {
+  return `QUESTION: ${question}${calib}
 
 OMENS (live search results):
 ${context || "(no omens retrieved — reason from base rates and say so)"}
@@ -120,6 +120,30 @@ Produce a JSON object with EXACTLY these fields:
 Be terse. Brevity is a feature.`;
 }
 
+// Self-calibration: AUGUR reads its OWN past accuracy and corrects future forecasts.
+// This is the "learning" loop — it improves by grading itself over time.
+async function calibrationNote() {
+  try {
+    const all = await insList(TABLE);
+    const resolved = all.filter((p) => p.status === "correct" || p.status === "wrong");
+    if (resolved.length < 3) return "";
+    const correct = resolved.filter((p) => p.status === "correct").length;
+    const acc = Math.round((correct / resolved.length) * 100);
+    const bands = [[50, 65], [66, 80], [81, 100]].map(([lo, hi]) => {
+      const inB = resolved.filter((p) => {
+        const c = p.probability >= 50 ? p.probability : 100 - p.probability;
+        return c >= lo && c <= hi;
+      });
+      if (!inB.length) return null;
+      const hit = inB.filter((p) => p.status === "correct").length;
+      return `${lo}-${hi}%→${Math.round((hit / inB.length) * 100)}% actual`;
+    }).filter(Boolean).join(", ");
+    return `\n\nSELF-CALIBRATION — learn from your own record: you are ${acc}% accurate over ${resolved.length} resolved forecasts. Confidence vs. reality: ${bands}. If a band has been OVERCONFIDENT, pull this forecast toward the base rate; if UNDERCONFIDENT, you may sharpen. Aim for true calibration.`;
+  } catch {
+    return "";
+  }
+}
+
 const VERSE_SYSTEM =
   "You are AUGUR, an ancient seer channeling a vision. Utter a 2-line cryptic " +
   "oracular couplet that foretells the answer. Mystical, evocative, a little ominous. " +
@@ -130,8 +154,8 @@ app.post("/api/prophecy", async (req, res) => {
   const question = clamp(req.body?.question).trim();
   if (!question) return res.status(400).json({ error: "question is required" });
   try {
-    const top = await searchOmens(question);
-    const analysis = safeJson(await llmComplete(FORECAST_SYSTEM, forecastUser(question, omenContext(top)), { jsonMode: true }));
+    const [top, calib] = await Promise.all([searchOmens(question), calibrationNote()]);
+    const analysis = safeJson(await llmComplete(FORECAST_SYSTEM, forecastUser(question, omenContext(top), calib), { jsonMode: true }));
     res.json({
       question, generated_at: new Date().toISOString(), analysis, sources: top,
       meta: { youcom: hasYouCom() ? "live" : "mock", llm: llmProvider() },
@@ -153,12 +177,12 @@ app.get("/api/prophecy/stream", async (req, res) => {
   });
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   try {
-    const top = await searchOmens(question);
+    const [top, calib] = await Promise.all([searchOmens(question), calibrationNote()]);
     send("omens", { count: top.length });
     const ctx = omenContext(top);
 
     // Full structured forecast runs in parallel while the verse streams.
-    const analysisP = llmComplete(FORECAST_SYSTEM, forecastUser(question, ctx), { jsonMode: true })
+    const analysisP = llmComplete(FORECAST_SYSTEM, forecastUser(question, ctx, calib), { jsonMode: true })
       .then(safeJson).catch(() => null);
 
     let verse = "";
