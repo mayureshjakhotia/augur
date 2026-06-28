@@ -5,7 +5,9 @@ calibrated forecast *with receipts*, speaks it aloud — then comes back and **g
 
 **Tracks:** GameCraft Arena (a self-scoring forecasting game) · Potion Lab (a personal foresight companion)
 
-**Live demo:** `./start.sh` → http://localhost:5173 (run with sound on)
+**Live demo:** https://hereby-uncle-legendary-logan.trycloudflare.com
+**Repo:** https://github.com/mayureshjakhotia/augur
+**Run locally:** `npm run build && npm start` → http://localhost:3001
 
 ---
 
