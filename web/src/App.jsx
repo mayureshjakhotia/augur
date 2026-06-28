@@ -194,8 +194,10 @@ export default function App() {
     <div className="min-h-screen max-w-5xl mx-auto px-5 py-10">
       <Header status={status} record={record} muted={muted} onToggleMute={() => { stopSpeak(); setMuted((m) => !m); }} />
 
+      {!prophecy && !loading && <DemoReel />}
+
       {/* Ask */}
-      <div className="mt-8">
+      <div className="mt-6">
         <div className="bg-panel/70 backdrop-blur-sm border border-arcane/20 rounded-2xl p-5 shadow-[0_0_60px_-15px_rgba(168,85,247,0.5)]">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
@@ -232,7 +234,6 @@ export default function App() {
         </div>
       </div>
 
-      {!prophecy && !loading && <DemoReel />}
       {!prophecy && !loading && <HowItWorks />}
       {error && <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-300">The omens are clouded: {error}</div>}
       {loading && <Ceremony verse={streamVerse} />}
@@ -634,16 +635,18 @@ function cites(text) {
 function Orb({ value, animate }) {
   const [shown, setShown] = useState(animate ? 0 : value);
   useEffect(() => {
-    if (!animate) { setShown(value); return; }
-    let raf, start;
+    if (!animate || typeof value !== "number") { setShown(value || 0); return; }
+    let raf, start, done = false;
     const step = (t) => {
       if (!start) start = t;
       const p = Math.min((t - start) / 800, 1);
       setShown(Math.round(value * (1 - Math.pow(1 - p, 3))));
-      if (p < 1) raf = requestAnimationFrame(step);
+      if (p < 1) raf = requestAnimationFrame(step); else done = true;
     };
     raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    // Guarantee it lands on the real value even if rAF is throttled (Save-Data/device sim).
+    const fallback = setTimeout(() => { if (!done) setShown(value); }, 900);
+    return () => { cancelAnimationFrame(raf); clearTimeout(fallback); };
   }, [value, animate]);
   value = shown;
   const r = 30, c = 2 * Math.PI * r, off = c - (value / 100) * c;
@@ -741,7 +744,7 @@ function DemoReel() {
           </div>
         )}
       </div>
-      <div className="mt-1 text-[11px] text-slate-500">↑ now ask your <span className="text-arcane font-medium">own</span> question — anything about the future</div>
+      <div className="mt-1 text-[11px] text-slate-500">↓ now ask your <span className="text-arcane font-medium">own</span> question — anything about the future</div>
     </div>
   );
 }
@@ -759,15 +762,16 @@ function Ceremony({ verse }) {
     return () => clearInterval(t);
   }, []);
   return (
-    <div className="mt-10 flex flex-col items-center justify-center py-14">
-      <div className="relative w-32 h-32">
-        <div className="absolute inset-0 rounded-full blur-2xl bg-arcane/40 aura" />
-        <div className="absolute inset-0 rounded-full border-2 border-arcane/30 border-t-ether spin-slow" />
-        <div className="absolute inset-2 rounded-full border border-ether/20 border-b-arcane spin-slow" style={{ animationDirection: "reverse" }} />
-        <div className="absolute inset-0 flex items-center justify-center text-4xl crystal-ball">🔮</div>
+    <div className="mt-10 flex flex-col items-center justify-center py-10">
+      <div className="portal">
+        <div className="portal-ring" />
+        <div className="portal-ring r2" />
+        <div className="portal-ring r3" />
+        <div className="portal-ring r4" />
+        <div className="portal-core"><span className="text-3xl crystal-ball">🔮</span></div>
       </div>
       {verse ? (
-        <p className="mt-8 max-w-xl text-center font-rune text-lg text-fuchsia-100 leading-relaxed glow-text whitespace-pre-line italic">
+        <p className="mt-8 max-w-xl text-center font-rune text-lg text-fuchsia-100 leading-relaxed glow-text whitespace-pre-line italic verse-reveal">
           {verse}<span className="inline-block w-2 h-5 ml-0.5 bg-ether align-middle animate-pulse" />
         </p>
       ) : (
