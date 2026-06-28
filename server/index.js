@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { youSearch, hasYouCom } from "./providers/youcom.js";
+import { tavilySearch, hasTavily } from "./providers/tavily.js";
 import { llmComplete, llmStream, llmProvider } from "./providers/llm.js";
 import { insList, insInsert, insUpdate, storageMode } from "./providers/insforge.js";
 import * as game from "./game.js";
@@ -45,6 +46,7 @@ const TABLE = "prophecies";
 app.get("/api/status", (_req, res) => {
   res.json({
     youcom: hasYouCom() ? "live" : "mock",
+    tavily: hasTavily() ? "live" : "off",
     llm: llmProvider(),
     storage: storageMode(),
     tts: ttsMode(),
@@ -66,10 +68,13 @@ app.get("/api/speak", async (req, res) => {
   }
 });
 
-// Read the omens — multi-angle real-time search via You.com, deduped.
+// Read the omens — cross-verified across You.com AND Tavily (two indices), deduped.
 async function searchOmens(question) {
   const queries = [question, `${question} latest news evidence`, `${question} analysis prediction odds`];
-  const batches = await Promise.all(queries.map((q) => youSearch(q, { count: 5 }).catch(() => [])));
+  const batches = await Promise.all([
+    ...queries.map((q) => youSearch(q, { count: 5 }).catch(() => [])),
+    tavilySearch(question, { count: 5 }).catch(() => []),
+  ]);
   const seen = new Set(), sources = [];
   for (const batch of batches) for (const s of batch) {
     if (s.url && !seen.has(s.url)) { seen.add(s.url); sources.push(s); }
