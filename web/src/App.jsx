@@ -232,6 +232,7 @@ export default function App() {
         </div>
       </div>
 
+      {!prophecy && !loading && <DemoReel />}
       {!prophecy && !loading && <HowItWorks />}
       {error && <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-300">The omens are clouded: {error}</div>}
       {loading && <Ceremony verse={streamVerse} />}
@@ -680,6 +681,67 @@ function HowItWorks() {
           <p className="text-xs text-slate-400 mt-1.5 leading-snug">{s.d}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Self-playing demo reel — shows the whole loop (ask → research → forecast → score).
+const DEMO = [
+  { q: "Will the Fed cut rates at its next meeting?", prob: 23, verdict: "Unlikely", src: "reuters.com" },
+  { q: "Will the Lakers make the 2026 playoffs?", prob: 71, verdict: "Likely", src: "espn.com" },
+  { q: "Will Bitcoin top $150k this year?", prob: 38, verdict: "Toss-up", src: "coindesk.com" },
+];
+function DemoReel() {
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState(0); // 0 type · 1 search · 2 reveal · 3 tracked
+  const [typed, setTyped] = useState("");
+
+  useEffect(() => {
+    if (phase !== 0) return;
+    const cur = DEMO[idx].q; setTyped(""); let i = 0;
+    const t = setInterval(() => {
+      i++; setTyped(cur.slice(0, i));
+      if (i >= cur.length) { clearInterval(t); setTimeout(() => setPhase(1), 500); }
+    }, 42);
+    return () => clearInterval(t);
+  }, [idx, phase]);
+  useEffect(() => {
+    if (phase === 1) { const t = setTimeout(() => setPhase(2), 1300); return () => clearTimeout(t); }
+    if (phase === 2) { const t = setTimeout(() => setPhase(3), 2200); return () => clearTimeout(t); }
+    if (phase === 3) { const t = setTimeout(() => { setIdx((x) => (x + 1) % DEMO.length); setPhase(0); }, 1700); return () => clearTimeout(t); }
+  }, [phase]);
+
+  const d = DEMO[idx];
+  return (
+    <div className="mt-6 bg-panel/50 border border-arcane/20 rounded-2xl p-5 relative overflow-hidden">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.3em] text-arcane/60 font-rune">See it work</div>
+        <div className="flex gap-1.5">{DEMO.map((_, i) => <span key={i} className={`w-1.5 h-1.5 rounded-full ${i === idx ? "bg-arcane" : "bg-white/15"}`} />)}</div>
+      </div>
+      <div className="bg-void/80 border border-arcane/25 rounded-xl px-4 py-3 text-sm text-slate-200 flex items-center gap-2 min-h-[48px]">
+        <span>🔮</span>
+        <span>{phase === 0 ? typed : d.q}{phase === 0 && <span className="inline-block w-1.5 h-4 bg-ether ml-0.5 animate-pulse align-middle" />}</span>
+      </div>
+      <div className="mt-3 min-h-[112px]">
+        {phase === 1 && (
+          <div className="flex items-center gap-2 text-ether text-sm pt-3">
+            <span className="w-2 h-2 rounded-full bg-ether aura" /> reading the live web…
+            <span className="text-slate-500 text-xs">(You.com)</span>
+          </div>
+        )}
+        {phase >= 2 && (
+          <div className="flex items-center gap-4 pt-1 verse-reveal">
+            <Orb key={idx} value={d.prob} animate />
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-arcane/70 font-rune">AUGUR's forecast</div>
+              <div className="text-lg font-semibold text-ether">{d.verdict}</div>
+              <div className="text-[11px] text-slate-500 mt-1">grounded in live sources · {d.src} cited</div>
+            </div>
+            {phase === 3 && <div className="ml-auto stamp-in text-emerald-300 text-sm font-rune">🎯 tracked ✓</div>}
+          </div>
+        )}
+      </div>
+      <div className="mt-1 text-[11px] text-slate-500">↑ now ask your <span className="text-arcane font-medium">own</span> question — anything about the future</div>
     </div>
   );
 }
