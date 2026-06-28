@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AUGUR · The AI that keeps score</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              rune: ["Cinzel", "serif"],
+              body: ["Inter", "system-ui", "sans-serif"],
+            },
+            colors: {
+              void: "#07060f",
+              abyss: "#0e0b1e",
+              panel: "#15112b",
+              arcane: "#a855f7",
+              ether: "#22d3ee",
+              gold: "#fbbf24",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body { font-family: "Inter", system-ui, sans-serif; }
+      .font-rune { font-family: "Cinzel", serif; letter-spacing: 0.02em; }
+
+      /* Arcane background: layered radial glows + starfield */
+      body {
+        background:
+          radial-gradient(900px 600px at 18% -5%, rgba(168, 85, 247, 0.18), transparent 60%),
+          radial-gradient(800px 600px at 100% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
+          radial-gradient(700px 700px at 50% 120%, rgba(168, 85, 247, 0.10), transparent 60%),
+          #07060f;
+        background-attachment: fixed;
+      }
+      #stars {
+        position: fixed; inset: 0; pointer-events: none; z-index: 0;
+        background-image:
+          radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1.5px 1.5px at 80% 20%, rgba(199,210,254,0.6), transparent),
+          radial-gradient(1px 1px at 35% 85%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1px 1px at 90% 55%, rgba(167,139,250,0.6), transparent),
+          radial-gradient(1px 1px at 10% 60%, rgba(255,255,255,0.4), transparent);
+        background-repeat: repeat;
+        animation: twinkle 6s ease-in-out infinite alternate;
+      }
+      @keyframes twinkle { from { opacity: .5 } to { opacity: .9 } }
+      @keyframes float-orb { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+      @keyframes pulse-aura { 0%,100% { opacity:.55 } 50% { opacity:1 } }
+      @keyframes spin-slow { to { transform: rotate(360deg) } }
+      .aura { animation: pulse-aura 1.6s ease-in-out infinite; }
+      .orb-float { animation: float-orb 4s ease-in-out infinite; }
+      .spin-slow { animation: spin-slow 18s linear infinite; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #2a2150; border-radius: 4px; }
+      .glow-text { text-shadow: 0 0 18px rgba(168,85,247,0.55); }
+    </style>
+  </head>
+  <body class="text-slate-100">
+    <div id="stars"></div>
+    <div id="root" style="position: relative; z-index: 1"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
