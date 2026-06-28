@@ -9,7 +9,36 @@ import { hasEleven, ttsMode, elevenSpeak } from "./providers/tts.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "32kb" })); // cap body size
+
+// --- Minimal security headers ---
+app.use((_req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "no-referrer");
+  next();
+});
+
+// --- Lightweight in-memory rate limiter (protects our sponsor credits) ---
+const RL = { windowMs: 60_000, max: 40, hits: new Map() };
+app.use("/api", (req, res, next) => {
+  // only throttle the expensive AI/search routes
+  if (!/^\/(prophecy|ask)/.test(req.path)) return next();
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const rec = RL.hits.get(ip) || { count: 0, reset: now + RL.windowMs };
+  if (now > rec.reset) { rec.count = 0; rec.reset = now + RL.windowMs; }
+  rec.count++;
+  RL.hits.set(ip, rec);
+  if (RL.hits.size > 5000) RL.hits.clear(); // crude memory guard
+  if (rec.count > RL.max) {
+    return res.status(429).json({ error: "The omens tire — too many requests. Try again shortly." });
+  }
+  next();
+});
+
+// Clamp user-supplied text to sane lengths before it reaches the LLM/search.
+const clamp = (s, n = 300) => (s || "").toString().slice(0, n);
 
 const TABLE = "prophecies";
 
@@ -93,7 +122,7 @@ const VERSE_SYSTEM =
 
 // ---- Core: divine a calibrated, cited forecast for any question ----
 app.post("/api/prophecy", async (req, res) => {
-  const question = (req.body?.question || "").trim();
+  const question = clamp(req.body?.question).trim();
   if (!question) return res.status(400).json({ error: "question is required" });
   try {
     const top = await searchOmens(question);
@@ -110,7 +139,7 @@ app.post("/api/prophecy", async (req, res) => {
 
 // ---- Streaming divination (SSE): the verse channels in live, then the receipts ----
 app.get("/api/prophecy/stream", async (req, res) => {
-  const question = (req.query.question || "").trim();
+  const question = clamp(req.query.question).trim();
   if (!question) return res.status(400).end();
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -148,8 +177,8 @@ app.get("/api/prophecy/stream", async (req, res) => {
 
 // ---- Conversational follow-up: drill into a forecast, grounded in fresh omens ----
 app.post("/api/ask", async (req, res) => {
-  const question = (req.body?.question || "").trim();
-  const followup = (req.body?.followup || "").trim();
+  const question = clamp(req.body?.question).trim();
+  const followup = clamp(req.body?.followup).trim();
   if (!followup) return res.status(400).json({ error: "followup is required" });
   try {
     const top = await searchOmens(`${question} ${followup}`);
@@ -321,6 +350,17 @@ function safeJson(raw) {
   const m = raw.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch {} }
   return { headline: "Prophecy", reasoning: raw, key_factors: [], probability: null };
+}
+
+// --- Serve the built frontend (single deployable in production) ---
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const webDist = path.join(__dirname, "../web/dist");
+if (fs.existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(webDist, "index.html")));
 }
 
 const PORT = process.env.PORT || 3001;

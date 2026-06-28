@@ -1,0 +1,11 @@
+{
+  "name": "augur",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AUGUR — a research assistant for the future that cites its sources and keeps score.",
+  "scripts": {
+    "build": "cd web && npm install && npm run build && cd ../server && npm install",
+    "start": "cd server && node index.js"
+  },
+  "engines": { "node": ">=18" }
+}

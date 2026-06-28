@@ -265,9 +265,8 @@ function Header({ status, record, muted, onToggleMute }) {
             <h1 className="font-rune text-4xl sm:text-5xl font-extrabold tracking-wide glow-text">AUGUR</h1>
           </div>
           <p className="text-slate-300 text-sm mt-2 max-w-xl leading-relaxed">
-            A <span className="text-slate-100 font-medium">research assistant for the future.</span> Ask anything uncertain —
-            AUGUR searches the <span className="text-ether">live web</span>, answers with a
-            <span className="text-arcane"> probability + sources you can check</span>, then tracks how often it's right.
+            A <span className="text-slate-100 font-medium">research assistant for the future</span> — ask anything uncertain,
+            get a <span className="text-ether">cited probability</span> from the live web, and watch it <span className="text-arcane">keep score</span>.
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -307,7 +306,7 @@ function RecordBar({ record }) {
           <Stat n={record.pending} label="pending" color="text-amber-400" />
         </div>
       </div>
-      <div className="flex items-center gap-5">
+      <div className="hidden sm:flex items-center gap-5">
         {record.head_to_head?.n > 0 && (
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">you vs augur</div>

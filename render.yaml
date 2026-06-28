@@ -1,0 +1,23 @@
+# One-click deploy on Render (render.com) — free web service.
+# After connecting the repo, set the secret env vars in the dashboard.
+services:
+  - type: web
+    name: augur
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: YOUCOM_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: INSFORGE_BASE_URL
+        sync: false
+      - key: INSFORGE_API_KEY
+        sync: false
+      # optional studio voice
+      - key: ELEVEN_API_KEY
+        sync: false
