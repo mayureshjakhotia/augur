@@ -1,0 +1,12 @@
+import { chromium } from "playwright-core";
+const b = await chromium.connectOverCDP("http://localhost:9222");
+const ctx = b.contexts()[0];
+const page = await ctx.newPage();
+await page.goto("https://hereby-uncle-legendary-logan.trycloudflare.com", { waitUntil: "domcontentloaded", timeout: 30000 });
+await page.waitForTimeout(3500);
+const title = await page.title();
+const acc = await page.evaluate(() => document.body.innerText.match(/(\d+)%\s*ACCURACY/i)?.[1] || "n/a");
+await page.screenshot({ path: "/tmp/augur-cdp/live.png" });
+console.log("title:", title, "| accuracy shown:", acc);
+await page.close();
+await b.close();

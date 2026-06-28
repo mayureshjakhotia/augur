@@ -278,6 +278,7 @@ function Header({ status, record, muted, onToggleMute }) {
           {status && (
             <div className="flex flex-wrap gap-2 justify-end">
               {badge("Omens · You.com", status.youcom === "live" ? "live" : "mock", status.youcom === "live")}
+              {status.tavily === "live" && badge("Omens · Tavily", "live", true)}
               {badge("Mind · Groq", status.llm !== "mock" ? "live" : "mock", status.llm !== "mock")}
               {badge("Ledger · InsForge", status.storage === "insforge" ? "live" : "mock", status.storage === "insforge")}
             </div>
