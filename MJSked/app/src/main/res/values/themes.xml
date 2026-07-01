@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme; Compose supplies the real Material 3 colors at runtime.
+         This just gives the splash/launch window sensible defaults. -->
+    <style name="Theme.MJSked" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/mjsked_indigo</item>
+        <item name="android:windowBackground">@color/mjsked_bg</item>
+    </style>
+</resources>

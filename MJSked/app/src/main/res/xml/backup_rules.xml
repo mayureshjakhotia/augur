@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Room DB is included; SMTP credentials in DataStore are excluded so
+         they are never uploaded to cloud backup. -->
+    <exclude domain="file" path="datastore/mjsked_settings.preferences_pb" />
+</full-backup-content>
