@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MJSked</string>
+    <string name="accessibility_label">MJSked auto-send</string>
+    <string name="accessibility_desc">Lets MJSked open WhatsApp/Telegram at the scheduled time and tap “Send” for you, so scheduled chats send automatically. MJSked only watches these chat apps and the lock screen — never your other apps.</string>
 </resources>

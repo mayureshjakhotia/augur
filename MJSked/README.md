@@ -49,11 +49,31 @@ answers each:
 | **SMS** | ✅ Fully | `SmsManager.sendMultipartTextMessage` (needs SEND_SMS). |
 | **Email** | ✅ Fully | JavaMail over your SMTP server (needs Internet). |
 | **Reminder** | ✅ Fully | High-priority notification. |
-| **WhatsApp / Telegram** | ⚙️ Prepared | Android forbids a background app from sending in these apps silently, so MJSked posts a "ready to send" notification that opens the chat **pre-filled** at the scheduled time. Optional accessibility auto-tap is on the roadmap and strictly opt-in. |
+| **WhatsApp / Telegram** | ✅ With auto-send on | Same mechanism as SKEDit: an **opt-in accessibility service** taps "Send" after MJSked wakes the screen and opens the chat pre-filled. With auto-send **off**, MJSked instead posts a tap-to-send notification (safe fallback). |
 
-This is a deliberate honesty trade-off: rather than *claiming* silent WhatsApp
-auto-send and failing intermittently (the #1 reliability complaint elsewhere),
-MJSked makes the one unavoidable tap explicit and never breaks.
+### WhatsApp / Telegram auto-send
+
+When enabled in **Settings → WhatsApp / Telegram auto-send**, a scheduled chat
+message fires with zero interaction:
+
+1. The alarm launches a tiny, invisible activity (allowed from the background
+   because MJSked holds the **Display over other apps** permission).
+2. That activity **wakes the screen**, asks to **dismiss the keyguard**, and —
+   if you saved a lock-screen code — the accessibility service **best-effort
+   types it** (see the security note below).
+3. It opens the chat in WhatsApp/Telegram with your text pre-filled.
+4. The **accessibility service taps "Send"** and clears the request.
+
+The accessibility service is **scoped to WhatsApp, Telegram and the lock screen
+only** (declared in `accessibility_service_config.xml`) — it cannot read your
+other apps.
+
+> **Security note — "unlock by code":** No Android app can bypass a **secure**
+> PIN, pattern, or biometric lock; that is an OS guarantee (SKEDit can't either).
+> MJSked can reliably wake the screen and dismiss a **non-secure / swipe** lock,
+> and will *attempt* to type a stored numeric code on the lock screen, but a
+> secure keyguard will still stop it. For guaranteed unattended sends, either
+> use a non-secure lock or keep the device unlocked at send time.
 
 ---
 
@@ -91,7 +111,21 @@ arms an alarm; pausing/deleting cancels it; recurrence re-arms the next fire.
 
 ---
 
-## Build & run
+## Get a ready-to-install APK (no toolchain needed)
+
+Every push that touches `MJSked/` triggers the **MJSked Android build** GitHub
+Action (`.github/workflows/mjsked-android.yml`), which runs the unit tests and
+produces a debug APK:
+
+1. Open the repo's **Actions** tab → latest **MJSked Android build** run.
+2. Download the **`mjsked-debug-apk`** artifact.
+3. Copy the `.apk` to your phone and install it (allow "install unknown apps").
+4. Open MJSked → **Settings** to turn on auto-send + (optionally) SMTP email.
+
+This exists because the app can't be compiled in every environment — CI builds
+the installable artifact for you.
+
+## Build & run locally
 
 Requires **Android Studio Koala (2024.1)+** or a local Android SDK.
 
@@ -143,7 +177,9 @@ and `.gitignore`), so it works as a standalone repository as-is.
 
 ## Roadmap (the "much better version")
 
-- [ ] Opt-in accessibility helper for true one-shot WhatsApp/Telegram auto-send
+- [x] Opt-in accessibility helper for one-shot WhatsApp/Telegram auto-send
+- [x] Screen-wake + keyguard-dismiss + best-effort lock-screen code at send time
+- [x] GitHub Actions CI that builds an installable APK
 - [ ] Contact picker (READ_CONTACTS) with name → number resolution
 - [ ] Attachments for email
 - [ ] Templates & quick-repeat from history

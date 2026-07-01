@@ -15,6 +15,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -36,9 +37,16 @@ import com.mjsked.app.data.EmailConfig
 @Composable
 fun SettingsScreen(
     emailConfig: EmailConfig,
+    autoSendEnabled: Boolean,
+    unlockCode: String,
     onBack: () -> Unit,
-    onSaveEmail: (EmailConfig) -> Unit
+    onSaveEmail: (EmailConfig) -> Unit,
+    onToggleAutoSend: (Boolean) -> Unit,
+    onSaveUnlockCode: (String) -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit
 ) {
+    var code by remember(unlockCode) { mutableStateOf(unlockCode) }
     var from by remember(emailConfig) { mutableStateOf(emailConfig.fromAddress) }
     var fromName by remember(emailConfig) { mutableStateOf(emailConfig.fromName) }
     var host by remember(emailConfig) { mutableStateOf(emailConfig.smtpHost) }
@@ -111,6 +119,62 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text(if (saved) "Saved ✓" else "Save email settings") }
+
+            Spacer(Modifier.height(24.dp))
+            Text("WhatsApp / Telegram auto-send", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "When ON, MJSked opens the chat at the scheduled time and taps Send for " +
+                    "you — no interaction needed. This requires two Android permissions " +
+                    "below. When OFF, MJSked just posts a tap-to-send notification.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(
+                        text = "Enable auto-send",
+                        checked = autoSendEnabled,
+                        onCheckedChange = onToggleAutoSend
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onOpenAccessibilitySettings,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+            ) { Text("1 · Turn on MJSked accessibility service") }
+            OutlinedButton(
+                onClick = onOpenOverlaySettings,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+            ) { Text("2 · Allow display over other apps") }
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Optional: lock-screen code",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                "If your phone is locked at send time, MJSked wakes the screen and can " +
+                    "best-effort type this numeric code. Note: Android does not let any " +
+                    "app bypass a secure PIN/biometric lock — this works for non-secure " +
+                    "or swipe locks. Stored only on this device.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            OutlinedTextField(
+                value = code,
+                onValueChange = { code = it.filter(Char::isDigit) },
+                label = { Text("Lock-screen code (digits)") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            )
+            Button(
+                onClick = { onSaveUnlockCode(code) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Save code") }
 
             Spacer(Modifier.height(24.dp))
             Text("Reliability", style = MaterialTheme.typography.titleLarge)

@@ -40,6 +40,12 @@ class MainViewModel(
     val emailConfig: StateFlow<EmailConfig> = settings.emailConfig
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailConfig())
 
+    val autoSendEnabled: StateFlow<Boolean> = settings.autoSendEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val unlockCode: StateFlow<String> = settings.unlockCode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
     fun save(item: ScheduledMessage) = viewModelScope.launch {
         val stamped = if (item.createdAt == 0L) {
             item.copy(createdAt = System.currentTimeMillis())
@@ -55,6 +61,14 @@ class MainViewModel(
 
     fun saveEmailConfig(config: EmailConfig) = viewModelScope.launch {
         settings.saveEmailConfig(config)
+    }
+
+    fun setAutoSend(enabled: Boolean) = viewModelScope.launch {
+        settings.setAutoSendEnabled(enabled)
+    }
+
+    fun setUnlockCode(code: String) = viewModelScope.launch {
+        settings.setUnlockCode(code)
     }
 
     companion object {

@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
                 val nav = rememberNavController()
                 val state by viewModel.uiState.collectAsState()
                 val emailConfig by viewModel.emailConfig.collectAsState()
+                val autoSendEnabled by viewModel.autoSendEnabled.collectAsState()
+                val unlockCode by viewModel.unlockCode.collectAsState()
 
                 NavHost(navController = nav, startDestination = "home") {
                     composable("home") {
@@ -84,8 +86,14 @@ class MainActivity : ComponentActivity() {
                     composable("settings") {
                         SettingsScreen(
                             emailConfig = emailConfig,
+                            autoSendEnabled = autoSendEnabled,
+                            unlockCode = unlockCode,
                             onBack = { nav.popBackStack() },
-                            onSaveEmail = viewModel::saveEmailConfig
+                            onSaveEmail = viewModel::saveEmailConfig,
+                            onToggleAutoSend = viewModel::setAutoSend,
+                            onSaveUnlockCode = viewModel::setUnlockCode,
+                            onOpenAccessibilitySettings = { openAccessibilitySettings() },
+                            onOpenOverlaySettings = { openOverlaySettings() }
                         )
                     }
                 }
@@ -108,6 +116,21 @@ class MainActivity : ComponentActivity() {
                     startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                 }
             }
+        }
+    }
+
+    private fun openAccessibilitySettings() {
+        runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    }
+
+    private fun openOverlaySettings() {
+        runCatching {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+            )
         }
     }
 }

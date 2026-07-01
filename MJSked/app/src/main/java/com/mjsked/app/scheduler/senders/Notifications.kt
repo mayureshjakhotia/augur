@@ -92,22 +92,21 @@ object Notifications {
         NotificationManagerCompat.from(context).notify(id, n)
     }
 
-    /** Builds the intent that opens a chat app with [item]'s text pre-filled. */
-    fun buildChatIntent(item: ScheduledMessage): Intent {
+    /** The deep-link URL that opens a chat app with [item]'s text pre-filled. */
+    fun buildChatUrl(item: ScheduledMessage): String {
         val text = Uri.encode(item.body)
         val phone = item.recipientList.firstOrNull()?.filter { it.isDigit() || it == '+' }
         return when (item.type) {
-            MessageType.TELEGRAM -> Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse("https://t.me/share/url?url=&text=$text")
-            }
-            else -> { // WhatsApp
-                val base = if (!phone.isNullOrBlank()) {
-                    "https://api.whatsapp.com/send?phone=$phone&text=$text"
-                } else {
-                    "https://api.whatsapp.com/send?text=$text"
-                }
-                Intent(Intent.ACTION_VIEW).apply { data = Uri.parse(base) }
+            MessageType.TELEGRAM -> "https://t.me/share/url?url=&text=$text"
+            else -> if (!phone.isNullOrBlank()) {
+                "https://api.whatsapp.com/send?phone=$phone&text=$text"
+            } else {
+                "https://api.whatsapp.com/send?text=$text"
             }
         }
     }
+
+    /** Builds the intent that opens a chat app with [item]'s text pre-filled. */
+    fun buildChatIntent(item: ScheduledMessage): Intent =
+        Intent(Intent.ACTION_VIEW, Uri.parse(buildChatUrl(item)))
 }

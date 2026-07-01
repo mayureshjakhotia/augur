@@ -40,7 +40,8 @@ class SettingsStore(private val context: Context) {
         val USER = stringPreferencesKey("smtp_user")
         val PASS = stringPreferencesKey("smtp_pass")
         val TLS = booleanPreferencesKey("smtp_tls")
-        val AUTO_TAP = booleanPreferencesKey("wa_auto_tap")
+        val AUTO_SEND = booleanPreferencesKey("auto_send_enabled")
+        val UNLOCK_CODE = stringPreferencesKey("unlock_code")
     }
 
     val emailConfig: Flow<EmailConfig> = context.dataStore.data.map { p ->
@@ -55,8 +56,11 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    /** Whether the accessibility helper should auto-tap "send" for prepared sends. */
-    val whatsAppAutoTap: Flow<Boolean> = context.dataStore.data.map { it[Keys.AUTO_TAP] ?: false }
+    /** Whether the accessibility helper should auto-open + auto-tap "send". */
+    val autoSendEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.AUTO_SEND] ?: false }
+
+    /** Optional lock-screen numeric code for waking a locked device (best-effort). */
+    val unlockCode: Flow<String> = context.dataStore.data.map { it[Keys.UNLOCK_CODE] ?: "" }
 
     suspend fun saveEmailConfig(c: EmailConfig) {
         context.dataStore.edit { p ->
@@ -70,7 +74,11 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun setWhatsAppAutoTap(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.AUTO_TAP] = enabled }
+    suspend fun setAutoSendEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_SEND] = enabled }
+    }
+
+    suspend fun setUnlockCode(code: String) {
+        context.dataStore.edit { it[Keys.UNLOCK_CODE] = code.filter { c -> c.isDigit() } }
     }
 }

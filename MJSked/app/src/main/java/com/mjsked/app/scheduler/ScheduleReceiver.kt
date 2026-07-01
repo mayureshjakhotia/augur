@@ -8,6 +8,7 @@ import com.mjsked.app.MJSkedApplication
 import com.mjsked.app.data.MessageStatus
 import com.mjsked.app.data.ScheduledMessage
 import com.mjsked.app.scheduler.senders.SendResult
+import com.mjsked.app.scheduler.senders.canDrawOverlays
 import com.mjsked.app.util.RecurrenceCalculator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +37,12 @@ class ScheduleReceiver : BroadcastReceiver() {
                 if (item.status != MessageStatus.PENDING) return@launch
 
                 val emailConfig = app.settingsStore.emailConfig.first()
-                val result = app.sendDispatcher.dispatch(item, emailConfig)
+                val autoSend = com.mjsked.app.scheduler.senders.AutoSendOptions(
+                    enabled = app.settingsStore.autoSendEnabled.first(),
+                    unlockCode = app.settingsStore.unlockCode.first(),
+                    canDrawOverlays = app.canDrawOverlays()
+                )
+                val result = app.sendDispatcher.dispatch(item, emailConfig, autoSend)
 
                 val now = System.currentTimeMillis()
                 val next = RecurrenceCalculator.nextOccurrence(item.scheduledAt, item.recurrence)
